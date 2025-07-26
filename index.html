@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gundam 00 RG Collection Tracker</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .chart-container {
+            position: relative;
+            margin: auto;
+            height: 320px;
+            width: 100%;
+            max-width: 320px;
+        }
+        .fade-in {
+            animation: fadeIn 0.5s ease-in-out;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .filter-btn.active {
+            background-color: #0d9488;
+            color: white;
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+        }
+        .owned-card {
+            border-color: #0d9488;
+            background-color: #f0fdfa;
+        }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800">
+
+    <div id="app" class="container mx-auto p-4 md:p-8 max-w-7xl">
+
+        <header class="text-center mb-8">
+            <h1 class="text-4xl md:text-5xl font-bold text-teal-700">Gundam 00 RG Lineup</h1>
+            <p class="text-slate-500 mt-2 text-lg">Interactive Collection & Variant Checklist</p>
+        </header>
+
+        <main>
+            <section id="dashboard" class="mb-8 p-6 bg-white rounded-xl shadow-md">
+                <h2 class="text-2xl font-bold mb-4 text-center">Collection Overview</h2>
+                <div class="chart-container">
+                    <canvas id="collectionChart"></canvas>
+                </div>
+            </section>
+
+            <section id="collection-grid">
+                <div id="filters" class="flex flex-wrap justify-center gap-2 mb-8">
+                    <button class="filter-btn active py-2 px-4 bg-white rounded-full shadow-sm font-semibold text-slate-700 hover:bg-teal-100 transition-all" data-filter="All">All Models</button>
+                    <button class="filter-btn py-2 px-4 bg-white rounded-full shadow-sm font-semibold text-slate-700 hover:bg-teal-100 transition-all" data-filter="Exia">Exia Line</button>
+                    <button class="filter-btn py-2 px-4 bg-white rounded-full shadow-sm font-semibold text-slate-700 hover:bg-teal-100 transition-all" data-filter="00">00 Line</button>
+                    <button class="filter-btn py-2 px-4 bg-white rounded-full shadow-sm font-semibold text-slate-700 hover:bg-teal-100 transition-all" data-filter="00 Qan[T]">00 Qan[T] Line</button>
+                </div>
+
+                <div id="model-list" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+                </div>
+            </section>
+        </main>
+        
+        <footer class="text-center mt-12 text-slate-400">
+            <p>Generated for Gunpla enthusiasts. Happy building!</p>
+        </footer>
+
+    </div>
+
+    <div id="modal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden items-center justify-center p-4">
+        <div id="modal-content" class="bg-white rounded-lg shadow-2xl p-6 w-full max-w-md relative fade-in">
+            <button id="modal-close" class="absolute top-4 right-4 text-slate-500 hover:text-slate-800 text-2xl">&times;</button>
+            <h3 id="modal-title" class="text-2xl font-bold mb-4 text-teal-700"></h3>
+            <p class="text-slate-600 mb-2"><strong class="font-semibold text-slate-800">Status:</strong> <span id="modal-status"></span></p>
+            <p class="text-slate-600"><strong class="font-semibold text-slate-800">Notes:</strong> <span id="modal-notes"></span></p>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const models = [
+                { id: 1, name: 'Exia', line: 'Exia', owned: true, status: 'Standard Release', notes: 'The original third-generation close-quarters combat Gundam.', imageUrl: 'https://placehold.co/100x100/E2E8F0/64748B?text=Exia+Box' },
+                { id: 2, name: 'Exia Repair I', line: 'Exia', owned: true, status: 'Custom Build / Lore', notes: 'Battle-damaged version from the end of Season 1. Requires customization.', imageUrl: 'https://placehold.co/100x100/E2E8F0/64748B?text=Repair+I+Box' },
+                { id: 3, name: 'Exia Repair II', line: 'Exia', owned: true, status: 'P-Bandai', notes: 'Upgraded version from the end of Season 2 with improved GN Drive performance.', imageUrl: 'https://placehold.co/100x100/E2E8F0/64748B?text=Repair+II+Box' },
+                { id: 4, name: 'Exia Repair III', line: 'Exia', owned: false, status: 'P-Bandai', notes: 'Equipped with a GN Long Rifle for sniping missions. From 00V side story.', imageUrl: 'https://placehold.co/100x100/E2E8F0/64748B?text=Repair+III+Box' },
+                { id: 5, name: 'Exia Repair IV', line: 'Exia', owned: false, status: 'Metal Build / Lore', notes: 'Features a grappling hook and asymmetrical design. No official RG kit exists.', imageUrl: 'https://placehold.co/100x100/E2E8F0/64744B?text=Repair+IV+Box' },
+                { id: 6, name: 'Avalanche Exia', line: 'Exia', owned: false, status: 'P-Bandai', notes: 'Equipped with the hs-A01 Avalanche unit for high-speed combat.', imageUrl: 'https://placehold.co/100x100/E2E8F0/64748B?text=Avalanche+Box' },
+                { id: 7, name: 'Avalanche Exia Dash', line: 'Exia', owned: false, status: 'P-Bandai', notes: 'Adds the Dash unit to the Avalanche Exia for atmospheric flight capability.', imageUrl: 'https://placehold.co/100x100/E2E8F0/64748B?text=Avalanche+Dash+Box' },
+                { id: 8, name: 'Exia (Trans-Am Mode)', line: 'Exia', owned: true, status: 'P-Bandai / Lore', notes: 'A color variant representing the activated Trans-Am system.', imageUrl: 'https://placehold.co/100x100/E2E8F0/64748B?text=Exia+Trans-Am+Box' },
+                { id: 9, name: 'Devise Exia', line: 'Exia', owned: false, status: 'Metal Build / 3rd Party', notes: 'Features the GN Devise Backpack. No official RG kit; requires custom parts.', imageUrl: 'https://placehold.co/100x100/E2E8F0/64748B?text=Devise+Exia+Box' },
+                { id: 10, name: '00 Raiser', line: '00', owned: true, status: 'Standard Release', notes: 'The combination of the 00 Gundam and the 0 Raiser support craft.', imageUrl: 'https://placehold.co/100x100/E2E8F0/64748B?text=00+Raiser+Box' },
+                { id: 11, name: '00 (Standalone)', line: '00', owned: false, status: 'Standard Release (part of 00 Raiser)', notes: 'The 00 Gundam without the 0 Raiser docking unit.', imageUrl: 'https://placehold.co/100x100/E2E8F0/64748B?text=00+Standalone+Box' },
+                { id: 12, name: '00 XN Raiser', line: '00', owned: true, status: 'P-Bandai Add-on', notes: 'Equips the 00 Raiser with the XN Unit, featuring additional binders and swords.', imageUrl: 'https://placehold.co/100x100/E2E8F0/64748B?text=XN+Raiser+Box' },
+                { id: 13, name: '00 Seven Sword', line: '00', owned: false, status: 'Lore / Custom Build', notes: 'Original conceptual loadout from 00V. Differs slightly from the /G version.', imageUrl: 'https://placehold.co/100x100/E2E8F0/64748B?text=Seven+Sword+Box' },
+                { id: 14, name: '00 Seven Sword/G', line: '00', owned: false, status: 'P-Bandai', notes: 'The primary Seven Sword variant, with the /G indicating the added GN Sword II Blaster.', imageUrl: 'https://placehold.co/100x100/E2E8F0/64748B?text=Seven+Sword/G+Box' },
+                { id: 15, name: '00 Seven Sword/G Inspection', line: '00', owned: false, status: 'P-Bandai', notes: 'A distinct red-colored version used in simulations. A variant of the /G.', imageUrl: 'https://placehold.co/100x100/E2E8F0/64748B?text=Inspection+Box' },
+                { id: 16, name: '00 Raiser (GN Condenser Type)', line: '00', owned: false, status: 'Lore / Custom Build', notes: 'A version from the end of Season 2 using a GN Condenser instead of a GN Drive in the 0 Raiser.', imageUrl: 'https://placehold.co/100x100/E2E8F0/64748B?text=Condenser+Box' },
+                { id: 17, name: '00 Raiser (Trans-Am Mode)', line: '00', owned: false, status: 'P-Bandai / Lore', notes: 'Color variant representing the activated Trans-Am system for the combined unit.', imageUrl: 'https://placehold.co/100x100/E2E8F0/64748B?text=Raiser+Trans-Am+Box' },
+                { id: 18, name: '00 (Trans-Am Mode)', line: '00', owned: false, status: 'P-Bandai / Lore', notes: 'Color variant for the standalone 00 Gundam in Trans-Am.', imageUrl: 'https://placehold.co/100x100/E2E8F0/64748B?text=00+Trans-Am+Box' },
+                { id: 19, name: '0 Gundam (Type A.C.D.)', line: '00', owned: false, status: 'Lore (HG Kit)', notes: 'Actual Combat Deployment version with iconic color scheme. No RG kit.', imageUrl: 'https://placehold.co/100x100/E2E8F0/64748B?text=0+ACD+Box' },
+                { id: 20, name: '00 Qan[T]', line: '00 Qan[T]', owned: true, status: 'Standard Release', notes: 'Setsuna\'s 5th generation Gundam built for dialogue with the ELS.', imageUrl: 'https://placehold.co/100x100/E2E8F0/64748B?text=Qan[T]+Box' },
+                { id: 21, name: '00 Qan[T] Full Saber', line: '00 Qan[T]', owned: false, status: 'P-Bandai', notes: 'Equipped with the GN Sword IV Full Saber, an alternate weapon configuration.', imageUrl: 'https://placehold.co/100x100/E2E8F0/64748B?text=Full+Saber+Box' },
+                { id: 22, name: '00 Qan[T] Burst Mode', line: '00 Qan[T]', owned: false, status: 'Lore / Custom Build', notes: 'An armor-purged state to amplify the Quantum System. Requires customization.', imageUrl: 'https://placehold.co/100x100/E2E8F0/64748B?text=Burst+Mode+Box' },
+                { id: 23, name: '00 Qan[T] (Trans-Am Mode)', line: '00 Qan[T]', owned: false, status: 'P-Bandai / Lore', notes: 'Color variant representing the activated Trans-Am system.', imageUrl: 'https://placehold.co/100x100/E2E8F0/64748B?text=Qan[T]+Trans-Am+Box' }
+            ];
+
+            const modelListContainer = document.getElementById('model-list');
+            const filterButtons = document.querySelectorAll('.filter-btn');
+            const modal = document.getElementById('modal');
+            const modalContent = document.getElementById('modal-content');
+            const modalClose = document.getElementById('modal-close');
+            let collectionChart;
+
+            const renderCards = (filter = 'All') => {
+                modelListContainer.innerHTML = '';
+                const filteredModels = models.filter(m => filter === 'All' || m.line === filter);
+
+                filteredModels.forEach(model => {
+                    const card = document.createElement('div');
+                    card.className = `model-card bg-white rounded-lg shadow-md p-4 flex flex-col justify-between border-2 transition-all cursor-pointer hover:shadow-lg hover:border-teal-500 fade-in ${model.owned ? 'owned-card' : 'border-transparent'}`;
+                    card.dataset.id = model.id;
+
+                    card.innerHTML = `
+                        <div class="flex items-center mb-4">
+                            <img src="${model.imageUrl}" alt="${model.name} Box Art" class="w-20 h-20 rounded-lg mr-4 object-cover shadow-sm">
+                            <div>
+                                <h3 class="font-bold text-lg text-slate-800">${model.name}</h3>
+                                <p class="text-sm text-teal-600 font-medium">${model.status}</p>
+                                <p class="text-xs text-slate-500">${model.line} Line</p>
+                            </div>
+                        </div>
+                        <div class="flex items-center justify-between mt-auto">
+                            <label class="flex items-center cursor-pointer">
+                                <input type="checkbox" class="owned-checkbox hidden" ${model.owned ? 'checked' : ''}>
+                                <div class="w-12 h-6 flex items-center bg-gray-300 rounded-full p-1 duration-300 ease-in-out">
+                                    <div class="bg-white w-5 h-5 rounded-full shadow-md transform duration-300 ease-in-out"></div>
+                                </div>
+                                <span class="ml-2 text-sm font-medium text-slate-600">Owned</span>
+                            </label>
+                            <span class="text-xs text-teal-600 font-semibold cursor-pointer">Details &rarr;</span>
+                        </div>
+                    `;
+                    modelListContainer.appendChild(card);
+                    updateCheckboxVisual(card.querySelector('.owned-checkbox'));
+                });
+                updateChart();
+            };
+            
+            const updateCheckboxVisual = (checkbox) => {
+                const toggle = checkbox.nextElementSibling;
+                const dot = toggle.querySelector('div');
+                if (checkbox.checked) {
+                    toggle.classList.remove('bg-gray-300');
+                    toggle.classList.add('bg-teal-500');
+                    dot.style.transform = 'translateX(1.25rem)';
+                } else {
+                    toggle.classList.remove('bg-teal-500');
+                    toggle.classList.add('bg-gray-300');
+                    dot.style.transform = 'translateX(0)';
+                }
+            };
+
+            const updateChart = () => {
+                const currentFilter = document.querySelector('.filter-btn.active').dataset.filter;
+                const filteredModels = models.filter(m => currentFilter === 'All' || m.line === currentFilter);
+
+                const ownedCount = filteredModels.filter(m => m.owned).length;
+                const notOwnedCount = filteredModels.length - ownedCount;
+
+                if (collectionChart) {
+                    collectionChart.data.labels = ['Owned', 'Not Owned'];
+                    collectionChart.data.datasets[0].data = [ownedCount, notOwnedCount];
+                    collectionChart.update();
+                } else {
+                    const ctx = document.getElementById('collectionChart').getContext('2d');
+                    collectionChart = new Chart(ctx, {
+                        type: 'doughnut',
+                        data: {
+                            labels: ['Owned', 'Not Owned'],
+                            datasets: [{
+                                label: 'Collection Status',
+                                data: [ownedCount, notOwnedCount],
+                                backgroundColor: [
+                                    '#14b8a6',
+                                    '#e2e8f0'
+                                ],
+                                borderColor: [
+                                    '#0d9488',
+                                    '#cbd5e1'
+                                ],
+                                borderWidth: 2,
+                                hoverOffset: 8
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            cutout: '70%',
+                            plugins: {
+                                legend: {
+                                    position: 'bottom',
+                                    labels: {
+                                        font: {
+                                            size: 14,
+                                            weight: '500'
+                                        }
+                                    }
+                                },
+                                tooltip: {
+                                    callbacks: {
+                                        label: function(context) {
+                                            let label = context.label || '';
+                                            if (label) {
+                                                label += ': ';
+                                            }
+                                            if (context.parsed !== null) {
+                                                label += context.parsed;
+                                            }
+                                            return label;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    });
+                }
+            };
+            
+            modelListContainer.addEventListener('click', (e) => {
+                const card = e.target.closest('.model-card');
+                if (!card) return;
+
+                const modelId = parseInt(card.dataset.id, 10);
+                const model = models.find(m => m.id === modelId);
+
+                if (e.target.closest('.owned-checkbox') || e.target.closest('label')) {
+                    if(e.target.type !== 'checkbox'){
+                        const checkbox = card.querySelector('.owned-checkbox');
+                        checkbox.checked = !checkbox.checked;
+                         const changeEvent = new Event('change', { bubbles: true });
+                         checkbox.dispatchEvent(changeEvent);
+                    }
+                    return;
+                }
+
+                document.getElementById('modal-title').textContent = model.name;
+                document.getElementById('modal-status').textContent = model.status;
+                document.getElementById('modal-notes').textContent = model.notes;
+                modal.classList.remove('hidden');
+                modal.classList.add('flex');
+            });
+            
+            modelListContainer.addEventListener('change', (e) => {
+                if(e.target.classList.contains('owned-checkbox')){
+                    const card = e.target.closest('.model-card');
+                    const modelId = parseInt(card.dataset.id, 10);
+                    const model = models.find(m => m.id === modelId);
+                    
+                    model.owned = e.target.checked;
+                    card.classList.toggle('owned-card', model.owned);
+                    updateCheckboxVisual(e.target);
+                    updateChart();
+                }
+            });
+
+            filterButtons.forEach(button => {
+                button.addEventListener('click', () => {
+                    filterButtons.forEach(btn => btn.classList.remove('active'));
+                    button.classList.add('active');
+                    renderCards(button.dataset.filter);
+                });
+            });
+
+            modalClose.addEventListener('click', () => {
+                modal.classList.add('hidden');
+                modal.classList.remove('flex');
+            });
+
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) {
+                    modal.classList.add('hidden');
+                    modal.classList.remove('flex');
+                }
+            });
+
+            renderCards();
+        });
+    </script>
+</body>
+</html>
